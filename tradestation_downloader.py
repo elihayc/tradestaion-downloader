@@ -215,9 +215,10 @@ class TradeStationDataDownloader:
             bars = data["Bars"]
             all_bars.extend(bars)
             request_count += 1
-            
-            # Get the oldest bar timestamp (convert to naive datetime)
-            oldest_bar_time = pd.to_datetime(bars[-1]["TimeStamp"])
+
+            # Bars are returned in ascending order (oldest first)
+            # Get the oldest bar timestamp (first bar in response)
+            oldest_bar_time = pd.to_datetime(bars[0]["TimeStamp"])
             if oldest_bar_time.tzinfo is not None:
                 oldest_bar_time = oldest_bar_time.replace(tzinfo=None)
             
