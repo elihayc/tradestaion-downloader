@@ -130,7 +130,8 @@ class TradeStationDataDownloader:
             "symbols_processed": 0,
             "bars_downloaded": 0,
             "errors": 0,
-            "start_time": None
+            "start_time": None,
+            "failed_symbols": []
         }
     
     def _get_headers(self) -> Dict[str, str]:
@@ -353,6 +354,7 @@ class TradeStationDataDownloader:
         if new_df.empty and existing_df is None:
             logger.warning(f"  ✗ No data retrieved for {symbol}")
             self.stats["errors"] += 1
+            self.stats["failed_symbols"].append(symbol)
             return None
         
         # Merge with existing data
@@ -419,6 +421,7 @@ class TradeStationDataDownloader:
             except Exception as e:
                 logger.error(f"Error processing {symbol}: {e}")
                 self.stats["errors"] += 1
+                self.stats["failed_symbols"].append(symbol)
             
             # Small delay between symbols
             if i < len(symbols):
@@ -432,7 +435,7 @@ class TradeStationDataDownloader:
     def _print_summary(self) -> None:
         """Print download summary statistics."""
         elapsed = datetime.now() - self.stats["start_time"]
-        
+
         logger.info(f"\n{'='*60}")
         logger.info("DOWNLOAD SUMMARY")
         logger.info(f"{'='*60}")
@@ -441,7 +444,15 @@ class TradeStationDataDownloader:
         logger.info(f"Errors: {self.stats['errors']}")
         logger.info(f"Time elapsed: {elapsed}")
         logger.info(f"Data saved to: {self.data_dir.absolute()}")
+
+        # Show failed symbols if any
+        if self.stats["failed_symbols"]:
+            logger.info(f"\nFailed symbols ({len(self.stats['failed_symbols'])}):")
+            for symbol in self.stats["failed_symbols"]:
+                logger.info(f"  - {symbol}")
+
         logger.info(f"{'='*60}\n")
+
 
 
 # Default US Futures symbols
