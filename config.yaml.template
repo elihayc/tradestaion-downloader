@@ -24,53 +24,87 @@ parallel_downloads: 1        # Parallel symbol downloads (keep at 1 to be safe)
 # Comment out this section to use all default US futures
 # Or specify exactly which symbols you want:
 symbols:
-  # Equity Index Futures
-  - "@ES"     # E-mini S&P 500
-  - "@NQ"     # E-mini Nasdaq 100
-  - "@YM"     # E-mini Dow Jones
+  # Index Futures
+  - "@ES"     # E-Mini S&P 500
+  - "@NQ"     # E-Mini Nasdaq 100
+  - "@YM"     # E-Mini DJIA ($5)
   - "@RTY"    # E-mini Russell 2000
-  
-  # Micro Equity Index
+  - "@EMD"    # E-Mini S&P Mid Cap 400
+  - "@SMC"    # E-Mini S&P Small Cap 600
+
+  # Micro Index Futures
   - "@MES"    # Micro E-mini S&P 500
-  - "@MNQ"    # Micro E-mini Nasdaq 100
-  
+  - "@MNQ"    # Micro E-mini Nasdaq-100
+  - "@MYM"    # Micro E-mini Dow
+  - "@M2K"    # Micro E-mini Russell 2000
+
   # Energy Futures
-  - "@CL"     # Crude Oil (WTI)
+  - "@CL"     # Light Sweet Crude Oil
   - "@NG"     # Natural Gas
   - "@RB"     # RBOB Gasoline
   - "@HO"     # Heating Oil
-  
+  - "@BRN"    # Brent Crude Oil
+
+  # Micro Energy
+  - "@MCL"    # Micro Crude Oil
+  - "@MNG"    # Micro Henry Hub Natural Gas
+
   # Metals Futures
-  - "@GC"     # Gold
-  - "@SI"     # Silver
-  - "@HG"     # Copper
+  - "@GC"     # Gold (COMEX)
+  - "@SI"     # Silver (COMEX)
+  - "@HG"     # Copper (COMEX)
   - "@PL"     # Platinum
-  
-  # Treasury Futures
-  - "@ZB"     # 30-Year Treasury Bond
-  - "@ZN"     # 10-Year Treasury Note
-  - "@ZF"     # 5-Year Treasury Note
-  - "@ZT"     # 2-Year Treasury Note
-  
+  - "@PA"     # Palladium
+
+  # Micro Metals
+  - "@MGC"    # E-Micro Gold
+  - "@SIL"    # E-Micro Silver
+  - "@MHG"    # Micro Copper
+
+  # Interest Rate (Treasury) Futures
+  - "@US"     # 30 Year US Treasury Bond
+  - "@TY"     # 10 Year US Treasury Note
+  - "@FV"     # 5 Year US Treasury Note
+  - "@TU"     # 2 Year US Treasury Note
+  - "@UB"     # Ultra T-Bond
+  - "@TEN"    # Ultra 10-Year Treasury Note
+  - "@TWE"    # 20 Year US Treasury Bond
+
   # Agriculture - Grains
-  - "@ZC"     # Corn
-  - "@ZS"     # Soybeans
-  - "@ZW"     # Wheat
-  
+  - "@C"      # Corn
+  - "@S"      # Soybeans
+  - "@W"      # Wheat
+  - "@KW"     # KC Wheat (Hard Red Winter)
+  - "@BO"     # Soybean Oil
+  - "@SM"     # Soybean Meal
+
   # Agriculture - Softs
-  - "@KC"     # Coffee
-  - "@SB"     # Sugar
-  - "@CT"     # Cotton
-  
-  # Agriculture - Meats
-  - "@LE"     # Live Cattle
-  - "@HE"     # Lean Hogs
-  
-  # Currency Futures
-  - "@6E"     # Euro FX
-  - "@6J"     # Japanese Yen
-  - "@6B"     # British Pound
-  - "@6A"     # Australian Dollar
-  
+  - "@KC"     # Coffee "C"
+  - "@SB"     # Sugar No. 11
+  - "@CT"     # Cotton No. 2
+  - "@CC"     # Cocoa
+  - "@OJ"     # FCOJ-A (Orange Juice)
+  - "@LBR"    # Lumber
+
+  # Meats
+  - "@LC"     # Live Cattle
+  - "@LH"     # Lean Hogs
+  - "@FC"     # Feeder Cattle
+
+  # Currencies
+  - "@EC"     # Euro / US Dollar
+  - "@JY"     # Japanese Yen / US Dollar
+  - "@BP"     # British Pound / US Dollar
+  - "@AD"     # Australian Dollar / US Dollar
+  - "@CD"     # Canadian Dollar / US Dollar
+  - "@SF"     # Swiss Franc / US Dollar
+  - "@DX"     # U.S. Dollar Index
+
   # Volatility
-  - "@VX"     # VIX Futures
+  - "@VX"     # CBOE Volatility Index (VIX)
+
+  # Crypto Futures
+  - "@BTC"    # CME Bitcoin Futures
+  - "@ETH"    # CME Ether Futures
+  - "@MBT"    # CME Micro Bitcoin Futures
+  - "@MET"    # CME Micro Ether Futures
