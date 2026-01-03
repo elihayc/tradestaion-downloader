@@ -16,11 +16,14 @@ Automated download of 1-minute futures data from TradeStation API with increment
 ### 1. Install
 
 ```bash
-# Using uv (recommended - fast, reproducible)
+# From PyPI (recommended)
+pip install tradestation-downloader
+
+# Or from source using uv
 pip install uv
 uv sync
 
-# Or standard pip install
+# Or standard pip from source
 pip install -e .
 
 # For development (includes pytest, ruff)
@@ -144,10 +147,8 @@ data = {s: pd.read_parquet(f"data/{s}_1min.parquet") for s in symbols}
 
 ## Python API
 
-Install from git:
-
 ```bash
-pip install git+https://github.com/elihayc/tradestation-downloader.git
+pip install tradestation-downloader
 ```
 
 Use programmatically in your project:
