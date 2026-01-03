@@ -13,6 +13,12 @@ build/
 dist/
 *.egg-info/
 
+# Testing
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+
 # Data files
 data/
 *.parquet

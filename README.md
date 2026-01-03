@@ -13,10 +13,18 @@ Automated download of 1-minute futures data from TradeStation API with increment
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Install
 
 ```bash
-pip install -r requirements.txt
+# Using uv (recommended - fast, reproducible)
+pip install uv
+uv sync
+
+# Or standard pip install
+pip install -e .
+
+# For development (includes pytest, ruff)
+pip install -e ".[dev]"
 ```
 
 ### 2. Get TradeStation API Credentials
@@ -27,6 +35,12 @@ pip install -r requirements.txt
 
 ### 3. Configure
 
+Option A - Interactive setup (recommended):
+```bash
+tradestation-auth
+```
+
+Option B - Manual setup:
 ```bash
 cp config.yaml.template config.yaml
 # Edit config.yaml with your credentials
@@ -34,18 +48,40 @@ cp config.yaml.template config.yaml
 
 ### 4. Run
 
+After install, CLI commands are available:
+
 ```bash
 # Download all configured symbols (incremental)
-python tradestation_downloader.py
+tradestation-download
 
 # Download specific symbols only
-python tradestation_downloader.py -s @ES @NQ @CL
+tradestation-download -s "@ES" "@NQ" "@CL"
 
 # Full download (ignore existing data)
-python tradestation_downloader.py --full
+tradestation-download --full
+
+# Use daily or monthly partitioned storage
+tradestation-download --storage-format daily
+tradestation-download --storage-format monthly
 
 # List all default symbols
-python tradestation_downloader.py --list-symbols
+tradestation-download --list-symbols
+
+# List symbol categories
+tradestation-download --list-categories
+
+# Download specific category
+tradestation-download --category index
+```
+
+> **Note:** On Windows, the `@` symbol has special meaning in CMD/PowerShell.
+> Always quote symbols: `"@ES"` instead of `@ES`.
+
+Or run directly with Python:
+
+```bash
+python tradestation_downloader.py
+python tradestation_downloader.py -s "@ES" "@NQ" "@CL"
 ```
 
 ## Configuration
@@ -106,6 +142,55 @@ symbols = ["ES", "NQ", "CL"]
 data = {s: pd.read_parquet(f"data/{s}_1min.parquet") for s in symbols}
 ```
 
+## Python API
+
+Install from git:
+
+```bash
+pip install git+https://github.com/elihayc/tradestaion-downloader.git
+```
+
+Use programmatically in your project:
+
+```python
+from tradestation import TradeStationDownloader, DownloadConfig, StorageFormat
+
+config = DownloadConfig(
+    client_id="your_client_id",
+    client_secret="your_client_secret",
+    refresh_token="your_refresh_token",
+    symbols=["@ES"],
+    data_dir="./data",
+    start_date="2020-01-01",
+    storage_format=StorageFormat.SINGLE,
+)
+
+downloader = TradeStationDownloader(config)
+data = downloader.download_all()
+
+# Access download statistics
+stats = downloader.stats
+print(f"Downloaded {stats.bars_downloaded} bars")
+print(f"Processed {stats.symbols_processed} symbols")
+print(f"Errors: {stats.errors}")
+
+# Use the data
+es_df = data["@ES"]
+print(es_df.head())
+```
+
+Or load from config file:
+
+```python
+from tradestation import TradeStationDownloader, load_config
+
+config = load_config("config.yaml")
+config.symbols = ["@ES", "@NQ"]  # Override symbols
+
+downloader = TradeStationDownloader(config)
+downloader.download_all()
+```
+
 ## Scheduling Daily Updates
 
 ### Linux/Mac (cron)
@@ -147,37 +232,11 @@ for f in data_dir.glob("*_1min.parquet"):
     print()
 ```
 
-## Integration with Interactive Brokers
-
-Once you have the data, you can use it for backtesting and then trade via IB:
-
-```python
-import pandas as pd
-from ib_insync import *
-
-# Load your backtested signals
-signals = pd.read_parquet("signals.parquet")
-
-# Connect to IB
-ib = IB()
-ib.connect('127.0.0.1', 7497, clientId=1)
-
-# Create contract
-es = Future('ES', '202503', 'CME')
-ib.qualifyContracts(es)
-
-# Execute based on signals
-for _, signal in signals.iterrows():
-    if signal['action'] == 'BUY':
-        order = MarketOrder('BUY', signal['quantity'])
-        trade = ib.placeOrder(es, order)
-```
-
 ## Troubleshooting
 
 ### "401 Unauthorized" Error
 
-Your refresh token may have expired. Get a new one from the TradeStation developer portal.
+Your refresh token may have expired. Run `tradestation-auth` to get a new one.
 
 ### "429 Rate Limited" Error
 
@@ -195,15 +254,18 @@ Some symbols may not have data going back to 2007. Check TradeStation's data ava
 
 ## Default Symbols
 
-Run `python tradestation_downloader.py --list-symbols` to see all default symbols:
+Run `tradestation-download --list-symbols` to see all default symbols:
 
 - **Equity Index**: @ES, @NQ, @YM, @RTY, @MES, @MNQ, etc.
-- **Energy**: @CL, @NG, @RB, @HO
+- **Energy**: @CL, @NG, @RB, @HO, @BRN
 - **Metals**: @GC, @SI, @HG, @PL, @PA
-- **Treasury**: @ZB, @ZN, @ZF, @ZT, @UB
-- **Agriculture**: @ZC, @ZS, @ZW, @KC, @SB, @CT, @LE, @HE
-- **Currency**: @6E, @6J, @6B, @6A, @6C, @6S
+- **Treasury**: @US, @TY, @FV, @TU, @UB, @TEN, @TWE
+- **Grains**: @C, @S, @W, @KW, @BO, @SM
+- **Softs**: @KC, @SB, @CT, @CC, @OJ, @LBR
+- **Meats**: @LC, @LH, @FC
+- **Currency**: @EC, @JY, @BP, @AD, @CD, @SF, @DX
 - **Volatility**: @VX
+- **Crypto**: @BTC, @ETH, @MBT, @MET
 
 ## License
 

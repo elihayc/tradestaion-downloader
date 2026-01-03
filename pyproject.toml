@@ -1,0 +1,99 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tradestation-downloader"
+version = "1.0.0"
+description = "Download and analyze historical futures data from TradeStation API"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "TradeStation Downloader Contributors" }
+]
+keywords = [
+    "tradestation",
+    "futures",
+    "trading",
+    "market-data",
+    "finance",
+    "parquet",
+    "time-series",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pandas>=2.0.0",
+    "pyarrow>=14.0.0",
+    "pyyaml>=6.0",
+    "requests>=2.28.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+tradestation-download = "tradestation.cli:main_download"
+tradestation-auth = "tradestation.cli:main_auth"
+
+[project.urls]
+Homepage = "https://github.com/elihayc/tradestation-downloader"
+Documentation = "https://github.com/elihayc/tradestation-downloader#readme"
+Repository = "https://github.com/elihayc/tradestation-downloader"
+Issues = "https://github.com/elihayc/tradestation-downloader/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tradestation"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by ruff format)
+    "B008",   # do not perform function calls in argument defaults
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --cov=tradestation --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["tradestation"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

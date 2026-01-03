@@ -1,9 +1,9 @@
 # TradeStation Historical Data Downloader Configuration
 # =====================================================
-# Copy this file to config.yaml and fill in your credentials
+# Copy this file to config.yaml and fill in your credentials.
+#
+# Get API credentials from: https://developer.tradestation.com/
 
-# TradeStation API Credentials
-# Get these from: https://developer.tradestation.com/
 tradestation:
   client_id: "YOUR_CLIENT_ID"
   client_secret: "YOUR_CLIENT_SECRET"
@@ -15,14 +15,19 @@ start_date: "2007-01-01"     # How far back to download
 interval: 1                   # Bar interval
 unit: "Minute"               # Bar unit: Minute, Daily, Weekly
 
-# Rate Limiting (be careful not to exceed API limits)
+# Storage Format
+#   "single"  - One parquet file per symbol (e.g., ES_1min.parquet)
+#   "daily"   - Hive-style partitioned by day (e.g., ES/year=2024/month=01/day=15/ES.parquet)
+#   "monthly" - Hive-style partitioned by month (e.g., ES/year=2024/month=01/ES.parquet)
+storage_format: "single"
+
+# Rate Limiting
 rate_limit_delay: 0.5        # Seconds between API requests
 max_retries: 3               # Retries on failed requests
-parallel_downloads: 1        # Parallel symbol downloads (keep at 1 to be safe)
 
 # Symbols to Download
-# Comment out this section to use all default US futures
-# Or specify exactly which symbols you want:
+# Comment out symbols you don't need, or add new ones.
+# Symbols marked "# Not Available" have no data on TradeStation.
 symbols:
   # Index Futures
   - "@ES"     # E-Mini S&P 500
