@@ -147,7 +147,7 @@ data = {s: pd.read_parquet(f"data/{s}_1min.parquet") for s in symbols}
 Install from git:
 
 ```bash
-pip install git+https://github.com/elihayc/tradestaion-downloader.git
+pip install git+https://github.com/elihayc/tradestation-downloader.git
 ```
 
 Use programmatically in your project:
