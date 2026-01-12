@@ -8,7 +8,7 @@ import sys
 
 from .config import ConfigurationError, load_config
 from .downloader import TradeStationDownloader
-from .models import DEFAULT_SYMBOLS, StorageFormat
+from .models import DEFAULT_SYMBOLS, Compression, StorageFormat
 
 # Configure logging
 logging.basicConfig(
@@ -58,6 +58,12 @@ Examples:
         choices=["single", "daily", "monthly"],
         metavar="FORMAT",
         help="Storage format: single, daily, or monthly",
+    )
+    parser.add_argument(
+        "--compression",
+        choices=["zstd", "snappy", "gzip", "lz4", "none"],
+        metavar="ALGO",
+        help="Parquet compression: zstd (default), snappy, gzip, lz4, or none",
     )
     parser.add_argument(
         "--list-symbols",
@@ -136,6 +142,10 @@ def run_download(args: argparse.Namespace) -> int:
     # Override storage format if provided
     if args.storage_format:
         config.storage_format = StorageFormat.from_string(args.storage_format)
+
+    # Override compression if provided
+    if args.compression:
+        config.compression = Compression.from_string(args.compression)
 
     # Run downloader
     try:

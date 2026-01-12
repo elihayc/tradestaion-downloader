@@ -23,6 +23,25 @@ class StorageFormat(Enum):
             raise ValueError(f"Invalid storage format: '{value}'. Must be one of: {valid}")
 
 
+class Compression(Enum):
+    """Parquet compression algorithm."""
+
+    ZSTD = "zstd"        # Best compression ratio, good speed (recommended)
+    SNAPPY = "snappy"    # Fast, moderate compression
+    GZIP = "gzip"        # Good compression, slower
+    LZ4 = "lz4"          # Fastest, lower compression
+    NONE = "none"        # No compression
+
+    @classmethod
+    def from_string(cls, value: str) -> "Compression":
+        """Create Compression from string value."""
+        try:
+            return cls(value.lower())
+        except ValueError:
+            valid = ", ".join(f"'{c.value}'" for c in cls)
+            raise ValueError(f"Invalid compression: '{value}'. Must be one of: {valid}")
+
+
 @dataclass
 class DownloadConfig:
     """Configuration for the TradeStation data downloader."""
@@ -39,11 +58,14 @@ class DownloadConfig:
     rate_limit_delay: float = 0.5
     max_retries: int = 3
     storage_format: StorageFormat = StorageFormat.SINGLE
+    compression: Compression = Compression.ZSTD
 
     def __post_init__(self):
         """Validate and convert fields after initialization."""
         if isinstance(self.storage_format, str):
             self.storage_format = StorageFormat.from_string(self.storage_format)
+        if isinstance(self.compression, str):
+            self.compression = Compression.from_string(self.compression)
 
 
 # Default US Futures symbols organized by category

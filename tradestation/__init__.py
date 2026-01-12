@@ -15,7 +15,7 @@ Quick Start:
 from .auth import AuthenticationError, TradeStationAuth
 from .config import ConfigurationError, load_config
 from .downloader import DownloadStats, TradeStationDownloader
-from .models import DEFAULT_SYMBOLS, DownloadConfig, StorageFormat, get_all_symbols
+from .models import DEFAULT_SYMBOLS, Compression, DownloadConfig, StorageFormat, get_all_symbols
 from .storage import StorageBackend, create_storage, detect_storage_format
 
 __version__ = "1.0.0"
@@ -26,6 +26,7 @@ __all__ = [
     "DownloadConfig",
     "DownloadStats",
     "StorageFormat",
+    "Compression",
     "StorageBackend",
     "load_config",
     "create_storage",

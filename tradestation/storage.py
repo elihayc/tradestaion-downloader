@@ -33,9 +33,11 @@ def _prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 class StorageBackend(ABC):
     """Abstract base class for data storage backends."""
 
-    def __init__(self, data_dir: Path):
+    def __init__(self, data_dir: Path, compression: str = "zstd"):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        # Convert "none" to None for pandas (no compression)
+        self.compression = None if compression == "none" else compression
 
     @abstractmethod
     def save(self, symbol: str, df: pd.DataFrame) -> None:
@@ -62,7 +64,7 @@ class SingleFileStorage(StorageBackend):
 
     def save(self, symbol: str, df: pd.DataFrame) -> None:
         df = _prepare_dataframe(df)
-        df.to_parquet(self._get_filepath(symbol), index=False, compression="snappy")
+        df.to_parquet(self._get_filepath(symbol), index=False, compression=self.compression)
 
     def load(self, symbol: str) -> pd.DataFrame | None:
         filepath = self._get_filepath(symbol)
@@ -109,7 +111,7 @@ class DailyPartitionedStorage(StorageBackend):
         for date, group in df.groupby(df["datetime"].dt.date):
             filepath = self._get_partition_path(symbol, datetime.combine(date, datetime.min.time()))
             filepath.parent.mkdir(parents=True, exist_ok=True)
-            group.to_parquet(filepath, index=False, compression="snappy")
+            group.to_parquet(filepath, index=False, compression=self.compression)
 
     def load(self, symbol: str) -> pd.DataFrame | None:
         files = self._get_partition_files(symbol)
@@ -158,7 +160,7 @@ class MonthlyPartitionedStorage(StorageBackend):
         for period, group in df.groupby(df["datetime"].dt.to_period("M")):
             filepath = self._get_partition_path(symbol, period.to_timestamp())
             filepath.parent.mkdir(parents=True, exist_ok=True)
-            group.to_parquet(filepath, index=False, compression="snappy")
+            group.to_parquet(filepath, index=False, compression=self.compression)
 
     def load(self, symbol: str) -> pd.DataFrame | None:
         files = self._get_partition_files(symbol)
@@ -189,9 +191,9 @@ _BACKENDS = {
 }
 
 
-def create_storage(storage_format: StorageFormat, data_dir: Path) -> StorageBackend:
+def create_storage(storage_format: StorageFormat, data_dir: Path, compression: str = "zstd") -> StorageBackend:
     """Create the appropriate storage backend."""
-    return _BACKENDS[storage_format](data_dir)
+    return _BACKENDS[storage_format](data_dir, compression=compression)
 
 
 def detect_storage_format(data_dir: Path) -> StorageFormat:

@@ -69,7 +69,11 @@ class TradeStationDownloader:
             config.client_secret,
             config.refresh_token,
         )
-        self._storage = create_storage(config.storage_format, Path(config.data_dir))
+        self._storage = create_storage(
+            config.storage_format,
+            Path(config.data_dir),
+            compression=config.compression.value,
+        )
         self._stats = DownloadStats()
 
     @property
@@ -244,6 +248,7 @@ class TradeStationDownloader:
         logger.info("Starting download: %d symbols", len(symbols))
         logger.info("Data directory: %s", Path(self.config.data_dir).absolute())
         logger.info("Storage format: %s", self.config.storage_format.value)
+        logger.info("Compression: %s", self.config.compression.value)
         logger.info("Incremental: %s", incremental)
         logger.info("#" * 60)
 

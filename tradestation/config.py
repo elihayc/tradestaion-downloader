@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from .models import DownloadConfig, StorageFormat, get_all_symbols
+from .models import Compression, DownloadConfig, StorageFormat, get_all_symbols
 
 
 class ConfigurationError(Exception):
@@ -68,6 +68,13 @@ def _parse_config(data: dict) -> DownloadConfig:
     except ValueError as e:
         raise ConfigurationError(str(e)) from e
 
+    # Parse compression
+    compression_str = data.get("compression", "zstd")
+    try:
+        compression = Compression.from_string(compression_str)
+    except ValueError as e:
+        raise ConfigurationError(str(e)) from e
+
     return DownloadConfig(
         client_id=ts_config["client_id"],
         client_secret=ts_config["client_secret"],
@@ -81,6 +88,7 @@ def _parse_config(data: dict) -> DownloadConfig:
         rate_limit_delay=data.get("rate_limit_delay", 0.5),
         max_retries=data.get("max_retries", 3),
         storage_format=storage_format,
+        compression=compression,
     )
 
 
@@ -106,8 +114,16 @@ unit: "Minute"               # Bar unit: Minute, Daily, Weekly
 # Storage Format
 # "single"  - One parquet file per symbol (e.g., ES_1min.parquet)
 # "daily"   - Hive-style partitioned by day (e.g., ES/year=2024/month=01/day=15/ES.parquet)
-# "monthly" - Hive-style partitioned by month (e.g., ES/year=2024/month=01/ES.parquet)
+# "monthly" - Hive-style partitioned by month (e.g., ES/year_month=2024-01/data-0.parquet)
 storage_format: "single"
+
+# Compression Algorithm
+# "zstd"   - Best compression ratio, good speed (recommended)
+# "snappy" - Fast, moderate compression
+# "gzip"   - Good compression, slower
+# "lz4"    - Fastest, lower compression
+# "none"   - No compression
+compression: "zstd"
 
 # Rate Limiting (be careful not to exceed API limits)
 rate_limit_delay: 0.5        # Seconds between API requests
