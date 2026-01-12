@@ -67,6 +67,9 @@ tradestation-download --full
 tradestation-download --storage-format daily
 tradestation-download --storage-format monthly
 
+# Use different compression (default: zstd)
+tradestation-download --compression snappy
+
 # List all default symbols
 tradestation-download --list-symbols
 
@@ -101,6 +104,8 @@ data_dir: "./data"
 start_date: "2007-01-01"
 interval: 1
 unit: "Minute"
+storage_format: "single"  # single, daily, or monthly
+compression: "zstd"       # zstd, snappy, gzip, lz4, or none
 
 symbols:
   - "@ES"    # E-mini S&P 500
@@ -110,14 +115,25 @@ symbols:
 
 ## Output Format
 
-Data is saved as Parquet files in the `data_dir`:
+Data is saved as Parquet files in the `data_dir`. Structure depends on storage format:
 
+**Single file (default):**
 ```
 data/
 ├── ES_1min.parquet
 ├── NQ_1min.parquet
-├── CL_1min.parquet
-└── ...
+└── CL_1min.parquet
+```
+
+**Monthly partitioned:**
+```
+data/
+├── ES/
+│   ├── year_month=2024-01/data-0.parquet
+│   ├── year_month=2024-02/data-0.parquet
+│   └── ...
+└── NQ/
+    └── ...
 ```
 
 Each file contains:
@@ -154,7 +170,7 @@ pip install tradestation-downloader
 Use programmatically in your project:
 
 ```python
-from tradestation import TradeStationDownloader, DownloadConfig, StorageFormat
+from tradestation import TradeStationDownloader, DownloadConfig, StorageFormat, Compression
 
 config = DownloadConfig(
     client_id="your_client_id",
@@ -164,6 +180,7 @@ config = DownloadConfig(
     data_dir="./data",
     start_date="2020-01-01",
     storage_format=StorageFormat.SINGLE,
+    compression=Compression.ZSTD,  # or SNAPPY, GZIP, LZ4, NONE
 )
 
 downloader = TradeStationDownloader(config)

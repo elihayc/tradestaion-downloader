@@ -47,6 +47,7 @@ tradestation-download                         # Incremental update
 tradestation-download -s "@ES" "@NQ" "@CL"   # Specific symbols (quote @ on Windows)
 tradestation-download --full                  # Full download
 tradestation-download --storage-format daily  # Daily partitions
+tradestation-download --compression snappy    # Use snappy compression
 tradestation-download --list-symbols          # List all symbols
 tradestation-download --list-categories       # List symbol categories
 tradestation-download --category index        # Download category
@@ -70,7 +71,17 @@ TradeStation API → TradeStationAuth (OAuth2) → TradeStationDownloader → St
 |--------|-----------|----------|
 | `single` | `data/ES_1min.parquet` | Simple, small datasets |
 | `daily` | `data/ES/year=2024/month=01/day=15/ES.parquet` | Large datasets, date-range queries |
-| `monthly` | `data/ES/year=2024/month=01/ES.parquet` | Balance of simplicity and partitioning |
+| `monthly` | `data/ES/year_month=2024-01/data-0.parquet` | Balance of simplicity and partitioning |
+
+## Compression
+
+| Algorithm | Description |
+|-----------|-------------|
+| `zstd` | Best compression ratio, good speed (default) |
+| `snappy` | Fast, moderate compression |
+| `gzip` | Good compression, slower |
+| `lz4` | Fastest, lower compression |
+| `none` | No compression |
 
 ## Configuration
 
@@ -83,6 +94,7 @@ tradestation:
   refresh_token: "..."
 
 storage_format: "single"  # or "daily", "monthly"
+compression: "zstd"       # or "snappy", "gzip", "lz4", "none"
 data_dir: "./data"
 start_date: "2007-01-01"
 ```
@@ -90,6 +102,7 @@ start_date: "2007-01-01"
 ## Key Classes
 
 - `StorageFormat` (Enum): SINGLE, DAILY, MONTHLY
+- `Compression` (Enum): ZSTD, SNAPPY, GZIP, LZ4, NONE
 - `DownloadConfig` (dataclass): All configuration parameters
 - `TradeStationAuth`: OAuth2 token management
 - `StorageBackend` (ABC): Abstract storage interface
