@@ -1,22 +1,10 @@
 # Release Instructions
 
-## Prerequisites
-
-Ensure build tools are installed:
-```bash
-uv pip install build twine
-```
-
-Or install all dev dependencies:
-```bash
-uv sync --extra dev
-```
-
 ## Steps to publish a new version to PyPI
 
 ### 1. Update version number
 
-Edit `pyproject.toml` and update the version:
+Edit `pyproject.toml` / __init__ and update the version:
 ```toml
 version = "1.1.0"  # Change to new version
 ```
