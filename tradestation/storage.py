@@ -68,6 +68,41 @@ class StorageBackend(ABC):
     def get_file_size(self, symbol: str) -> int:
         """Get total file size in bytes for a symbol."""
 
+    def get_last_timestamp(self, symbol: str) -> datetime | None:
+        """Get the last timestamp for a symbol without loading all data.
+
+        Default implementation loads all data. Subclasses can override for efficiency.
+        """
+        df = self.load(symbol)
+        if df is None or df.empty:
+            return None
+        if isinstance(df.index, pd.DatetimeIndex):
+            return df.index.max().to_pydatetime()
+        if "datetime" in df.columns:
+            return df["datetime"].max().to_pydatetime()
+        return None
+
+    def append(self, symbol: str, new_df: pd.DataFrame) -> None:
+        """Append new data to existing data.
+
+        Default implementation loads all data, merges, and saves.
+        Subclasses can override for efficiency.
+        """
+        existing_df = self.load(symbol)
+        if existing_df is None or existing_df.empty:
+            self.save(symbol, new_df)
+            return
+
+        # Ensure datetime is a column for merging
+        if "datetime" not in existing_df.columns and isinstance(existing_df.index, pd.DatetimeIndex):
+            existing_df = existing_df.reset_index(names=["datetime"])
+        if "datetime" not in new_df.columns and isinstance(new_df.index, pd.DatetimeIndex):
+            new_df = new_df.reset_index(names=["datetime"])
+
+        merged = pd.concat([existing_df, new_df], ignore_index=True)
+        merged = merged.drop_duplicates(subset=["datetime"], keep="last").sort_values("datetime")
+        self.save(symbol, merged)
+
 
 class SingleFileStorage(StorageBackend):
     """Store all data for each symbol in a single Parquet file."""
@@ -152,6 +187,49 @@ class DailyPartitionedStorage(StorageBackend):
     def get_file_size(self, symbol: str) -> int:
         return sum(f.stat().st_size for f in self._get_partition_files(symbol))
 
+    def get_last_timestamp(self, symbol: str) -> datetime | None:
+        """Get last timestamp by reading only the latest partition."""
+        files = self._get_partition_files(symbol)
+        if not files:
+            return None
+        try:
+            # Files are sorted, so last file is the latest partition
+            df = pd.read_parquet(files[-1])
+            if isinstance(df.index, pd.DatetimeIndex):
+                return df.index.max().to_pydatetime()
+            if "datetime" in df.columns:
+                return pd.to_datetime(df["datetime"]).max().to_pydatetime()
+            return None
+        except Exception as e:
+            logger.warning("Failed to get last timestamp for %s: %s", symbol, e)
+            return None
+
+    def append(self, symbol: str, new_df: pd.DataFrame) -> None:
+        """Append new data by only updating affected partitions."""
+        new_df = _prepare_dataframe(new_df, datetime_index=False)
+        if new_df.empty:
+            return
+
+        for date, group in new_df.groupby(new_df["datetime"].dt.date):
+            filepath = self._get_partition_path(symbol, datetime.combine(date, datetime.min.time()))
+
+            # If partition exists, merge with existing data
+            if filepath.exists():
+                try:
+                    existing = pd.read_parquet(filepath)
+                    if isinstance(existing.index, pd.DatetimeIndex):
+                        existing = existing.reset_index(names=["datetime"])
+                    merged = pd.concat([existing, group], ignore_index=True)
+                    merged = merged.drop_duplicates(subset=["datetime"], keep="last").sort_values("datetime")
+                    group = merged
+                except Exception as e:
+                    logger.warning("Failed to merge partition %s: %s", filepath, e)
+
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+            if self.datetime_index:
+                group = group.set_index("datetime")
+            group.to_parquet(filepath, index=self.datetime_index, compression=self.compression)
+
 
 class MonthlyPartitionedStorage(StorageBackend):
     """Store data partitioned by month (Hive-style: symbol/year_month=YYYY-MM/)."""
@@ -203,6 +281,49 @@ class MonthlyPartitionedStorage(StorageBackend):
 
     def get_file_size(self, symbol: str) -> int:
         return sum(f.stat().st_size for f in self._get_partition_files(symbol))
+
+    def get_last_timestamp(self, symbol: str) -> datetime | None:
+        """Get last timestamp by reading only the latest partition."""
+        files = self._get_partition_files(symbol)
+        if not files:
+            return None
+        try:
+            # Files are sorted, so last file is the latest partition
+            df = pd.read_parquet(files[-1])
+            if isinstance(df.index, pd.DatetimeIndex):
+                return df.index.max().to_pydatetime()
+            if "datetime" in df.columns:
+                return pd.to_datetime(df["datetime"]).max().to_pydatetime()
+            return None
+        except Exception as e:
+            logger.warning("Failed to get last timestamp for %s: %s", symbol, e)
+            return None
+
+    def append(self, symbol: str, new_df: pd.DataFrame) -> None:
+        """Append new data by only updating affected partitions."""
+        new_df = _prepare_dataframe(new_df, datetime_index=False)
+        if new_df.empty:
+            return
+
+        for period, group in new_df.groupby(new_df["datetime"].dt.to_period("M")):
+            filepath = self._get_partition_path(symbol, period.to_timestamp())
+
+            # If partition exists, merge with existing data
+            if filepath.exists():
+                try:
+                    existing = pd.read_parquet(filepath)
+                    if isinstance(existing.index, pd.DatetimeIndex):
+                        existing = existing.reset_index(names=["datetime"])
+                    merged = pd.concat([existing, group], ignore_index=True)
+                    merged = merged.drop_duplicates(subset=["datetime"], keep="last").sort_values("datetime")
+                    group = merged
+                except Exception as e:
+                    logger.warning("Failed to merge partition %s: %s", filepath, e)
+
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+            if self.datetime_index:
+                group = group.set_index("datetime")
+            group.to_parquet(filepath, index=self.datetime_index, compression=self.compression)
 
 
 _BACKENDS = {

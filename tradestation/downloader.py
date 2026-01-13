@@ -88,43 +88,39 @@ class TradeStationDownloader:
         self,
         symbols: list[str] | None = None,
         incremental: bool = True,
-    ) -> dict[str, pd.DataFrame]:
+    ) -> DownloadStats:
         """Download data for all configured symbols (parallel or sequential)."""
         symbols = symbols or self.config.symbols
         if not symbols:
             logger.error("No symbols configured")
-            return {}
+            return self._stats
 
         self._stats = DownloadStats(start_time=datetime.now())
         self._log_start(symbols, incremental)
 
-        results = {}
         max_workers = self.config.max_workers
 
         if max_workers <= 1:
             # Sequential download (original behavior)
-            results = self._download_sequential(symbols, incremental)
+            self._download_sequential(symbols, incremental)
         else:
             # Parallel download
-            results = self._download_parallel(symbols, incremental, max_workers)
+            self._download_parallel(symbols, incremental, max_workers)
 
         self._stats.end_time = datetime.now()
         self._log_summary()
-        return results
+        return self._stats
 
     def _download_sequential(
         self,
         symbols: list[str],
         incremental: bool,
-    ) -> dict[str, pd.DataFrame]:
+    ) -> None:
         """Download symbols sequentially."""
-        results = {}
         for i, symbol in enumerate(symbols, 1):
             logger.info("[%d/%d] Processing %s...", i, len(symbols), symbol)
             try:
-                df = self.download_symbol(symbol, incremental)
-                if df is not None:
-                    results[symbol] = df
+                self.download_symbol(symbol, incremental)
             except Exception as e:
                 logger.error("Error processing %s: %s", symbol, e)
                 with self._stats_lock:
@@ -134,30 +130,26 @@ class TradeStationDownloader:
             if i < len(symbols):
                 time.sleep(0.2)
 
-        return results
-
     def _download_parallel(
         self,
         symbols: list[str],
         incremental: bool,
         max_workers: int,
-    ) -> dict[str, pd.DataFrame]:
+    ) -> None:
         """Download symbols in parallel using ThreadPoolExecutor."""
-        results = {}
         total = len(symbols)
 
         logger.info("Using %d parallel workers", max_workers)
 
-        def download_one(symbol: str) -> tuple[str, pd.DataFrame | None]:
+        def download_one(symbol: str) -> str:
             try:
-                df = self.download_symbol(symbol, incremental)
-                return symbol, df
+                self.download_symbol(symbol, incremental)
             except Exception as e:
                 logger.error("Error processing %s: %s", symbol, e)
                 with self._stats_lock:
                     self._stats.errors += 1
                     self._stats.failed_symbols.append(symbol)
-                return symbol, None
+            return symbol
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(download_one, sym): sym for sym in symbols}
@@ -165,47 +157,45 @@ class TradeStationDownloader:
 
             for future in as_completed(futures):
                 completed += 1
-                symbol, df = future.result()
+                symbol = future.result()
                 logger.info("[%d/%d] Completed %s", completed, total, symbol)
-                if df is not None:
-                    results[symbol] = df
 
-        return results
-
-    def download_symbol(self, symbol: str, incremental: bool = True) -> pd.DataFrame | None:
+    def download_symbol(self, symbol: str, incremental: bool = True) -> None:
         """Download data for a single symbol."""
         start_date = datetime.strptime(self.config.start_date, "%Y-%m-%d")
-        existing_df = None
+        has_existing = False
 
         if incremental:
-            existing_df = self._storage.load(symbol)
-            if existing_df is not None and len(existing_df) > 0:
-                # Get last date from index (if datetime_index=True) or column
-                if "datetime" in existing_df.columns:
-                    last_date = existing_df["datetime"].max()
-                else:
-                    last_date = existing_df.index.max()
-                logger.info("  [%s] Existing: %d bars up to %s", symbol, len(existing_df), last_date)
-                start_date = last_date + timedelta(minutes=1)
+            # Use optimized method - only reads latest partition for partitioned storage
+            last_timestamp = self._storage.get_last_timestamp(symbol)
+            if last_timestamp is not None:
+                has_existing = True
+                logger.info("  [%s] Existing data up to %s", symbol, last_timestamp)
+                start_date = last_timestamp + timedelta(minutes=1)
 
         logger.info("  [%s] Downloading from %s...", symbol, start_date.date())
         new_df = self._fetch_bars(symbol, start_date)
 
-        if new_df.empty and existing_df is None:
+        if new_df.empty and not has_existing:
             logger.warning("  [%s] No data retrieved", symbol)
             with self._stats_lock:
                 self._stats.errors += 1
                 self._stats.failed_symbols.append(symbol)
-            return None
+            return
 
-        df = self._merge_data(existing_df, new_df)
-        self._storage.save(symbol, df)
+        if new_df.empty:
+            logger.info("  [%s] Already up to date", symbol)
+            with self._stats_lock:
+                self._stats.symbols_processed += 1
+            return
+
+        # Use optimized append - only updates affected partitions for partitioned storage
+        self._storage.append(symbol, new_df)
 
         with self._stats_lock:
             self._stats.symbols_processed += 1
             self._stats.bars_downloaded += len(new_df)
-        logger.info("  [%s] Added %d bars, total %d", symbol, len(new_df), len(df))
-        return df
+        logger.info("  [%s] Added %d bars", symbol, len(new_df))
 
     def _fetch_bars(self, symbol: str, start_date: datetime) -> pd.DataFrame:
         """Fetch all bars for a symbol from start_date to now."""
@@ -297,23 +287,6 @@ class TradeStationDownloader:
         df = df.sort_values("datetime").drop_duplicates(subset=["datetime"], keep="last")
         df = df[df["datetime"] >= start_date]
         return df.reset_index(drop=True)
-
-    @staticmethod
-    def _merge_data(existing: pd.DataFrame | None, new: pd.DataFrame) -> pd.DataFrame:
-        """Merge existing and new data."""
-        if existing is None or existing.empty:
-            return new
-        if new.empty:
-            return existing
-
-        # Ensure datetime is a column (not index) for both DataFrames before merging
-        if "datetime" not in existing.columns and isinstance(existing.index, pd.DatetimeIndex):
-            existing = existing.reset_index(names=["datetime"])
-        if "datetime" not in new.columns and isinstance(new.index, pd.DatetimeIndex):
-            new = new.reset_index(names=["datetime"])
-
-        df = pd.concat([existing, new], ignore_index=True)
-        return df.drop_duplicates(subset=["datetime"], keep="last").sort_values("datetime").reset_index(drop=True)
 
     def _log_start(self, symbols: list[str], incremental: bool) -> None:
         logger.info("")
