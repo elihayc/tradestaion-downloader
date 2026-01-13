@@ -4,9 +4,11 @@ TradeStation market data downloader.
 
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 import pandas as pd
@@ -76,6 +78,7 @@ class TradeStationDownloader:
             datetime_index=config.datetime_index,
         )
         self._stats = DownloadStats()
+        self._stats_lock = Lock()  # Thread-safe stats updates
 
     @property
     def stats(self) -> DownloadStats:
@@ -86,7 +89,7 @@ class TradeStationDownloader:
         symbols: list[str] | None = None,
         incremental: bool = True,
     ) -> dict[str, pd.DataFrame]:
-        """Download data for all configured symbols."""
+        """Download data for all configured symbols (parallel or sequential)."""
         symbols = symbols or self.config.symbols
         if not symbols:
             logger.error("No symbols configured")
@@ -96,6 +99,26 @@ class TradeStationDownloader:
         self._log_start(symbols, incremental)
 
         results = {}
+        max_workers = self.config.max_workers
+
+        if max_workers <= 1:
+            # Sequential download (original behavior)
+            results = self._download_sequential(symbols, incremental)
+        else:
+            # Parallel download
+            results = self._download_parallel(symbols, incremental, max_workers)
+
+        self._stats.end_time = datetime.now()
+        self._log_summary()
+        return results
+
+    def _download_sequential(
+        self,
+        symbols: list[str],
+        incremental: bool,
+    ) -> dict[str, pd.DataFrame]:
+        """Download symbols sequentially."""
+        results = {}
         for i, symbol in enumerate(symbols, 1):
             logger.info("[%d/%d] Processing %s...", i, len(symbols), symbol)
             try:
@@ -104,14 +127,49 @@ class TradeStationDownloader:
                     results[symbol] = df
             except Exception as e:
                 logger.error("Error processing %s: %s", symbol, e)
-                self._stats.errors += 1
-                self._stats.failed_symbols.append(symbol)
+                with self._stats_lock:
+                    self._stats.errors += 1
+                    self._stats.failed_symbols.append(symbol)
 
             if i < len(symbols):
-                time.sleep(1)
+                time.sleep(0.2)
 
-        self._stats.end_time = datetime.now()
-        self._log_summary()
+        return results
+
+    def _download_parallel(
+        self,
+        symbols: list[str],
+        incremental: bool,
+        max_workers: int,
+    ) -> dict[str, pd.DataFrame]:
+        """Download symbols in parallel using ThreadPoolExecutor."""
+        results = {}
+        total = len(symbols)
+
+        logger.info("Using %d parallel workers", max_workers)
+
+        def download_one(symbol: str) -> tuple[str, pd.DataFrame | None]:
+            try:
+                df = self.download_symbol(symbol, incremental)
+                return symbol, df
+            except Exception as e:
+                logger.error("Error processing %s: %s", symbol, e)
+                with self._stats_lock:
+                    self._stats.errors += 1
+                    self._stats.failed_symbols.append(symbol)
+                return symbol, None
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(download_one, sym): sym for sym in symbols}
+            completed = 0
+
+            for future in as_completed(futures):
+                completed += 1
+                symbol, df = future.result()
+                logger.info("[%d/%d] Completed %s", completed, total, symbol)
+                if df is not None:
+                    results[symbol] = df
+
         return results
 
     def download_symbol(self, symbol: str, incremental: bool = True) -> pd.DataFrame | None:
@@ -132,7 +190,8 @@ class TradeStationDownloader:
 
                 if start_date >= datetime.now() - timedelta(hours=1):
                     logger.info("  Already up to date")
-                    self._stats.symbols_skipped += 1
+                    with self._stats_lock:
+                        self._stats.symbols_skipped += 1
                     return existing_df
 
         logger.info("  Downloading from %s...", start_date.date())
@@ -140,15 +199,17 @@ class TradeStationDownloader:
 
         if new_df.empty and existing_df is None:
             logger.warning("  No data retrieved")
-            self._stats.errors += 1
-            self._stats.failed_symbols.append(symbol)
+            with self._stats_lock:
+                self._stats.errors += 1
+                self._stats.failed_symbols.append(symbol)
             return None
 
         df = self._merge_data(existing_df, new_df)
         self._storage.save(symbol, df)
 
-        self._stats.symbols_processed += 1
-        self._stats.bars_downloaded += len(new_df)
+        with self._stats_lock:
+            self._stats.symbols_processed += 1
+            self._stats.bars_downloaded += len(new_df)
         logger.info("  Saved %d bars", len(df))
         return df
 
@@ -261,6 +322,7 @@ class TradeStationDownloader:
         logger.info("Storage format: %s", self.config.storage_format.value)
         logger.info("Compression: %s", self.config.compression.value)
         logger.info("Incremental: %s", incremental)
+        logger.info("Parallel workers: %d", self.config.max_workers)
         logger.info("#" * 60)
 
     def _log_summary(self) -> None:

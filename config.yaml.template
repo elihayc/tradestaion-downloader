@@ -22,7 +22,7 @@ unit: "Minute"               # Bar unit: Minute, Daily, Weekly
 storage_format: "single"
 
 # Rate Limiting
-rate_limit_delay: 0.5        # Seconds between API requests
+rate_limit_delay: 0.2        # Seconds between API requests
 max_retries: 3               # Retries on failed requests
 
 # Symbols to Download

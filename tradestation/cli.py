@@ -91,6 +91,13 @@ Examples:
         action="store_true",
         help="Enable verbose (debug) logging",
     )
+    parser.add_argument(
+        "-w", "--workers",
+        type=int,
+        default=4,
+        metavar="N",
+        help="Number of parallel download workers (default: 4, use 1 for sequential)",
+    )
 
     return parser
 
@@ -155,6 +162,10 @@ def run_download(args: argparse.Namespace) -> int:
     # Override datetime_index if provided
     if args.no_datetime_index:
         config.datetime_index = False
+
+    # Override workers if provided
+    if args.workers:
+        config.max_workers = args.workers
 
     # Run downloader
     try:

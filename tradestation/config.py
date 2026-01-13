@@ -85,7 +85,7 @@ def _parse_config(data: dict) -> DownloadConfig:
         interval=data.get("interval", 1),
         unit=data.get("unit", "Minute"),
         max_bars_per_request=data.get("max_bars_per_request", 57600),
-        rate_limit_delay=data.get("rate_limit_delay", 0.5),
+        rate_limit_delay=data.get("rate_limit_delay", 0.2),
         max_retries=data.get("max_retries", 3),
         storage_format=storage_format,
         compression=compression,
@@ -126,7 +126,7 @@ storage_format: "single"
 compression: "zstd"
 
 # Rate Limiting (be careful not to exceed API limits)
-rate_limit_delay: 0.5        # Seconds between API requests
+rate_limit_delay: 0.2        # Seconds between API requests
 max_retries: 3               # Retries on failed requests
 
 # Symbols to Download

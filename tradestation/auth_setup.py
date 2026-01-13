@@ -152,7 +152,7 @@ def save_config(client_id: str, client_secret: str, refresh_token: str):
         "interval": 1,
         "unit": "Minute",
         "storage_format": "single",
-        "rate_limit_delay": 0.5,
+        "rate_limit_delay": 0.2,
         "max_retries": 3,
         "symbols": [
             "@ES",

@@ -55,8 +55,9 @@ class DownloadConfig:
     interval: int = 1
     unit: str = "Minute"
     max_bars_per_request: int = 57600  # ~40 days of 1-min bars
-    rate_limit_delay: float = 0.5
+    rate_limit_delay: float = 0.2  # Delay between API batches (seconds)
     max_retries: int = 3
+    max_workers: int = 4  # Parallel download workers (1 = sequential)
     storage_format: StorageFormat = StorageFormat.SINGLE
     compression: Compression = Compression.ZSTD
     datetime_index: bool = True  # Save with datetime as index (adds _index_1 suffix)

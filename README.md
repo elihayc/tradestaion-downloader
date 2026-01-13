@@ -6,6 +6,7 @@ Automated download of 1-minute futures data from TradeStation API with increment
 
 - **OAuth2 Authentication** - Automatic token refresh
 - **Incremental Updates** - Only downloads new bars since last run
+- **Parallel Downloads** - Up to 4 concurrent symbol downloads (configurable)
 - **Rate Limiting** - Respects API limits with configurable delays
 - **Parquet Storage** - Fast, compressed columnar format
 - **Resume Capability** - Interrupted downloads can be resumed
@@ -81,6 +82,12 @@ tradestation-download --category index
 
 # Save without datetime index (raw format)
 tradestation-download -s @ES --no-datetime-index
+
+# Use more parallel workers for faster downloads (default: 4)
+tradestation-download -w 8
+
+# Sequential download (no parallelism)
+tradestation-download -w 1
 ```
 
 > **Note:** On Windows, the `@` symbol has special meaning in CMD/PowerShell.
@@ -109,6 +116,7 @@ interval: 1
 unit: "Minute"
 storage_format: "single"  # single, daily, or monthly
 compression: "zstd"       # zstd, snappy, gzip, lz4, or none
+max_workers: 4            # parallel download workers (1 = sequential)
 
 symbols:
   - "@ES"    # E-mini S&P 500
@@ -223,6 +231,7 @@ config = DownloadConfig(
     start_date="2020-01-01",
     storage_format=StorageFormat.SINGLE,
     compression=Compression.ZSTD,  # or SNAPPY, GZIP, LZ4, NONE
+    max_workers=4,  # parallel downloads (1 = sequential)
 )
 
 downloader = TradeStationDownloader(config)
@@ -301,8 +310,11 @@ Your refresh token may have expired. Run `tradestation-auth` to get a new one.
 ### "429 Rate Limited" Error
 
 The script handles this automatically, but if persistent:
+- Reduce `max_workers` (e.g., `-w 2`)
 - Increase `rate_limit_delay` in config
 - Reduce number of symbols per run
+
+TradeStation allows 500 requests per 5-minute window for bar chart data. The default settings (4 workers, 0.2s delay) stay well within these limits.
 
 ### Missing Data
 
