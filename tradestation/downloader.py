@@ -6,7 +6,7 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -210,7 +210,7 @@ class TradeStationDownloader:
     def _fetch_bars(self, symbol: str, start_date: datetime) -> pd.DataFrame:
         """Fetch all bars for a symbol from start_date to now."""
         all_bars = []
-        current_end = datetime.now()
+        current_end = datetime.now(timezone.utc).replace(tzinfo=None)
         batch_num = 0
 
         while current_end > start_date:
