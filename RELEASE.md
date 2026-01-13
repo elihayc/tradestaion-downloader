@@ -6,7 +6,7 @@
 
 Edit `pyproject.toml` / tradestation/__init__.py and update the version:
 ```toml
-version = "1.1.0"  # Change to new version
+version = "1.0.5"  # Change to new version
 ```
 
 ### 2. Update lock file
@@ -21,8 +21,8 @@ This updates `uv.lock` to reflect the new version and ensures build tools are in
 
 ```bash
 git add pyproject.toml tradestation/__init__.py uv.lock
-git commit -m "Bump version to 1.1.0"
-git tag v1.1.0
+git commit -m "Bump version to 1.0.5"
+git tag v1.0.5
 git push && git push --tags
 ```
 
