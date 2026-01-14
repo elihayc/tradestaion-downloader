@@ -160,20 +160,29 @@ class TradeStationDownloader:
                 symbol = future.result()
                 logger.info("[%d/%d] Completed %s", completed, total, symbol)
 
+    def _get_download_start(self, symbol: str, incremental: bool) -> tuple[datetime, bool]:
+        """
+        Determine effective start date for downloading.
+
+        Returns (start_date, has_existing_data).
+        """
+        config_start = datetime.strptime(self.config.start_date, "%Y-%m-%d")
+
+        if not incremental:
+            return config_start, False
+
+        last_timestamp = self._storage.get_last_timestamp(symbol)
+        if last_timestamp is None:
+            return config_start, False
+
+        logger.info("  [%s] Existing data up to %s", symbol, last_timestamp)
+        return last_timestamp, True  # Re-fetch last bar to ensure completeness
+
     def download_symbol(self, symbol: str, incremental: bool = True) -> None:
         """Download data for a single symbol."""
-        start_date = datetime.strptime(self.config.start_date, "%Y-%m-%d")
-        has_existing = False
+        start_date, has_existing = self._get_download_start(symbol, incremental)
 
-        if incremental:
-            # Use optimized method - only reads latest partition for partitioned storage
-            last_timestamp = self._storage.get_last_timestamp(symbol)
-            if last_timestamp is not None:
-                has_existing = True
-                logger.info("  [%s] Existing data up to %s", symbol, last_timestamp)
-                start_date = last_timestamp + timedelta(minutes=1)
-
-        logger.info("  [%s] Downloading from %s...", symbol, start_date.date())
+        logger.info("  [%s] Downloading from %s...", symbol, start_date.strftime("%Y-%m-%d %H:%M:%S"))
         new_df = self._fetch_bars(symbol, start_date)
 
         if new_df.empty and not has_existing:
@@ -197,6 +206,11 @@ class TradeStationDownloader:
             self._stats.bars_downloaded += len(new_df)
         logger.info("  [%s] Added %d bars", symbol, len(new_df))
 
+    def _calc_barsback(self, start_date: datetime, end_date: datetime) -> int:
+        """Calculate optimal bars to request based on time gap (1-min bars)."""
+        minutes_gap = int((end_date - start_date).total_seconds() / 60)
+        return max(1, min(minutes_gap, self.config.max_bars_per_request))
+
     def _fetch_bars(self, symbol: str, start_date: datetime) -> pd.DataFrame:
         """Fetch all bars for a symbol from start_date to now."""
         all_bars = []
@@ -204,7 +218,8 @@ class TradeStationDownloader:
         batch_num = 0
 
         while current_end > start_date:
-            data = self._api_request(symbol, current_end)
+            barsback = self._calc_barsback(start_date, current_end)
+            data = self._api_request(symbol, current_end, barsback=barsback)
             if not data or "Bars" not in data or not data["Bars"]:
                 break
 
@@ -225,13 +240,19 @@ class TradeStationDownloader:
         df = self._bars_to_dataframe(all_bars, start_date)
         return df.iloc[:-1] if len(df) > 0 else df  # Drop last (incomplete) bar
 
-    def _api_request(self, symbol: str, last_date: datetime, retry: int = 0) -> dict[str, Any] | None:
+    def _api_request(
+        self,
+        symbol: str,
+        last_date: datetime,
+        barsback: int | None = None,
+        retry: int = 0,
+    ) -> dict[str, Any] | None:
         """Make API request with retry logic."""
         url = f"{self.BASE_URL}/marketdata/barcharts/{symbol}"
         params = {
             "interval": self.config.interval,
             "unit": self.config.unit,
-            "barsback": self.config.max_bars_per_request,
+            "barsback": barsback or self.config.max_bars_per_request,
             "lastdate": last_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
         headers = {
@@ -246,12 +267,12 @@ class TradeStationDownloader:
                 wait = int(resp.headers.get("Retry-After", 60))
                 logger.warning("Rate limited, waiting %ds...", wait)
                 time.sleep(wait)
-                return self._api_request(symbol, last_date, retry)
+                return self._api_request(symbol, last_date, barsback, retry)
 
             if resp.status_code == 401:
                 logger.info("Token expired, refreshing...")
                 self._auth.invalidate()
-                return self._api_request(symbol, last_date, retry)
+                return self._api_request(symbol, last_date, barsback, retry)
 
             resp.raise_for_status()
             return resp.json()
@@ -261,7 +282,7 @@ class TradeStationDownloader:
                 wait = 2 ** retry
                 logger.warning("Request failed: %s. Retrying in %ds...", e, wait)
                 time.sleep(wait)
-                return self._api_request(symbol, last_date, retry + 1)
+                return self._api_request(symbol, last_date, barsback, retry + 1)
             logger.error("Request failed after %d retries: %s", self.config.max_retries, e)
             return None
 
